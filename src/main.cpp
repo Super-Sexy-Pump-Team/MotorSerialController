@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 // Constants
-const uint8_t SERIAL2_RX_PIN = 16;  // Define your RX pin
+const uint8_t SERIAL2_RX_PIN = 18;  // Define your RX pin
 const uint8_t SERIAL2_TX_PIN = 17;  // Define your TX pin
 const uint32_t SERIAL_BAUD = 115200;
 const uint8_t DEVICE_ID = 0;
@@ -22,19 +22,28 @@ bool writeThrottle(uint8_t deviceId, float throttleMs);
 String inputString = "";
 bool stringComplete = false;
 
+
 void setup() {
   // Initialize primary Serial for debugging
   Serial.begin(115200);
   while (!Serial) delay(10);
-  
+
   // Initialize Serial2 for ESC communication
   Serial2.begin(SERIAL_BAUD, SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
-  
+
+  // Ensure the throttle is set to neutral (1.5ms) at startup (this should prevent motor movement)
+  writeThrottle(DEVICE_ID, 1.5);  // Set throttle to 1.5ms (neutral)
+
   // Clear any pending data
   while (Serial2.available()) Serial2.read();
-  
-  Serial.println("ESP32-S3 ESC Controller initialized");
+
+  // Send 5 0x00 bytes to clear the command buffer and synchronize with the ESC
+  uint8_t clearBuffer[] = {0x00, 0x00, 0x00, 0x00, 0x00};
+  Serial2.write(clearBuffer, sizeof(clearBuffer));  // Send the 5 zero bytes
+
+  Serial.println("ESP32-S3 ESC Controller initialized and command buffer cleared");
 }
+
 
 void loop() {
   // Read and display ESC data
@@ -79,15 +88,20 @@ void loop() {
   }
 
   Serial.println("------------------------");
-  delay(1000);  // Update every second
+  // Use the delay() to control the frequency of loop()
+  // Min delay(10) for 100 Hz
+  delay(1000);
 }
+
 
 uint8_t calculateChecksum(uint8_t* data, size_t length) {
   uint16_t sum = 0;
   for (size_t i = 0; i < length; i++) {
-    sum += data[i];
+    sum += data[i];  // Sum the first four bytes (ignoring the checksum byte)
   }
-  return (256 - (sum % 256)) % 256;
+  
+  // Now calculate the checksum as modular sum 0 - bytes
+  return (256 - (sum % 256));
 }
 
 void createCommand(uint8_t deviceId, uint8_t reg, uint16_t data, uint8_t* command) {
@@ -143,7 +157,7 @@ float readVoltage(uint8_t deviceId) {
 float readThrottle(uint8_t deviceId) {
   int16_t value = readRegister(deviceId, 3);
   if (value >= 0) {
-    return (float)value / 2042.0;
+    return (float)value / 2042.0 * 1.0;
   }
   return -1.0;
 }
@@ -165,6 +179,6 @@ float readRPM(uint8_t deviceId) {
 }
 
 bool writeThrottle(uint8_t deviceId, float throttleMs) {
-  uint16_t throttleValue = (uint16_t)((throttleMs - 1.0) / 1.0 * 65535);
+  uint16_t throttleValue = (uint16_t)((throttleMs - 1.0) * 65535);
   return writeRegister(deviceId, 128, throttleValue) >= 0;
 }
