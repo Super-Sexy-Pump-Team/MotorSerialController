@@ -33,7 +33,11 @@ void setup() {
   Serial2.begin(SERIAL_BAUD, SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
 
   // Ensure the throttle is set to neutral (1.5ms) at startup (this should prevent motor movement)
-  writeThrottle(DEVICE_ID, 1.5);  // Set throttle to 1.5ms (neutral)
+  try {
+    writeThrottle(DEVICE_ID, 1.5);
+  } catch (std::runtime_error& e) {
+    Serial.println("Failed to set throttle to neutral: " + String(e.what()));
+  }
 
   // Send 5 0x00 bytes to clear the command buffer and synchronize with the ESC
   uint8_t clearBuffer[] = {0x00, 0x00, 0x00, 0x00, 0x00};
@@ -54,7 +58,7 @@ void loop() {
     voltage = readVoltage(DEVICE_ID);
     Serial.printf("%.2fV\n", voltage);
   } catch (std::runtime_error& e) {
-    Serial.println("Failed to read voltage");
+    Serial.println("Failed to read voltage: " + String(e.what()));
   }
 
   Serial.print("Current: ");
@@ -63,7 +67,7 @@ void loop() {
     current = readCurrent(DEVICE_ID);
     Serial.printf("%.2fA\n", current);
   } catch (std::runtime_error& e) {
-    Serial.println("Failed to read current");
+    Serial.println("Failed to read current: " + String(e.what()));
   }
 
   float power = voltage * current;
@@ -75,7 +79,7 @@ void loop() {
     throttle = readThrottle(DEVICE_ID);
     Serial.printf("%.2fms\n", throttle);
   } catch (std::runtime_error& e) {
-    Serial.println("Failed to read throttle");
+    Serial.println("Failed to read throttle: " + String(e.what()));
   }
 
   Serial.print("RPM: ");
@@ -84,7 +88,7 @@ void loop() {
     rpm = readRPM(DEVICE_ID);
     Serial.printf("%.0f\n", rpm);
   } catch (std::runtime_error& e) {
-    Serial.println("Failed to read RPM");
+    Serial.println("Failed to read RPM: " + String(e.what()));
   }
   
   // Check for serial input
@@ -101,10 +105,11 @@ void loop() {
   if (stringComplete) {
     float throttleMs = inputString.toFloat();
     if (throttleMs >= 1.0 && throttleMs <= 2.0) {
-      if (writeThrottle(DEVICE_ID, throttleMs)) {
-        Serial.printf("Throttle set to: %.2fms\n", throttleMs);
-      } else {
-        Serial.println("Failed to set throttle");
+      try {
+        writeThrottle(DEVICE_ID, throttleMs);
+        Serial.println("Throttle set to " + String(throttleMs) + "ms");
+      } catch (std::runtime_error& e) {
+        Serial.println("Failed to set throttle: " + String(e.what()));
       }
     } else {
       Serial.println("Invalid throttle value (must be between 1.0 and 2.0)");
@@ -150,6 +155,8 @@ int16_t parseResponse(uint8_t* response) {
 int16_t readRegister(uint8_t deviceId, uint8_t reg) {
   uint8_t command[5];
   uint8_t response[3];
+
+  while (Serial2.available()) Serial2.read();  // Clear receive buffer
   
   createCommand(deviceId, reg, 0, command);
   Serial2.write(command, 5);
@@ -172,7 +179,7 @@ int16_t readRegister(uint8_t deviceId, uint8_t reg) {
     return responseVal;
   }
   else {
-    throw std::runtime_error("Invalid response");
+    throw std::runtime_error("Invalid response data");
     return -1;
   }
 }
@@ -180,15 +187,31 @@ int16_t readRegister(uint8_t deviceId, uint8_t reg) {
 int16_t writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) {
   uint8_t command[5];
   uint8_t response[3];
+
+  while (Serial2.available()) Serial2.read();  // Clear receive buffer
   
   createCommand(deviceId, reg, value, command);
   Serial2.write(command, 5);
   
-  if (Serial2.available() >= 3) {
-    Serial2.readBytes(response, 3);
-    return parseResponse(response);
+  uint16_t timeout = 0;
+  while (Serial2.available() < 3){
+    delay(1);
+    timeout++;
+
+    if (timeout > 1000) {
+      throw std::runtime_error("Write Response Timeout");
+      return -1;
+    }
   }
-  return -1;
+
+  int16_t responseVal = parseResponse(response);
+  if (responseVal != 0xFFFF) {
+    return responseVal;
+  }
+  else {
+    throw std::runtime_error("Write Error");
+    return -1;
+  }
 }
 
 float readVoltage(uint8_t deviceId) {
