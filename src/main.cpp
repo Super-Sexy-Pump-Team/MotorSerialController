@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <stdexcept>
 
 // Constants
 const uint8_t SERIAL2_RX_PIN = 18;  // Define your RX pin
@@ -34,12 +35,12 @@ void setup() {
   // Ensure the throttle is set to neutral (1.5ms) at startup (this should prevent motor movement)
   writeThrottle(DEVICE_ID, 1.5);  // Set throttle to 1.5ms (neutral)
 
-  // Clear any pending data
-  while (Serial2.available()) Serial2.read();
-
   // Send 5 0x00 bytes to clear the command buffer and synchronize with the ESC
   uint8_t clearBuffer[] = {0x00, 0x00, 0x00, 0x00, 0x00};
   Serial2.write(clearBuffer, sizeof(clearBuffer));  // Send the 5 zero bytes
+
+  // Clear receive buffer
+  while (Serial2.available()) Serial2.read();
 
   Serial.println("ESP32-S3 ESC Controller initialized and command buffer cleared");
 }
@@ -47,18 +48,44 @@ void setup() {
 
 void loop() {
   // Read and display ESC data
-  float voltage = readVoltage(DEVICE_ID);
-  float current = readCurrent(DEVICE_ID);
-  float throttle = readThrottle(DEVICE_ID);
-  float rpm = readRPM(DEVICE_ID);
-  float power = voltage * current;
+  Serial.print("Voltage: ");
+  float voltage = 0.0;
+  try{
+    voltage = readVoltage(DEVICE_ID);
+    Serial.printf("%.2fV\n", voltage);
+  } catch (std::runtime_error& e) {
+    Serial.println("Failed to read voltage");
+  }
 
-  // Print readings
-  Serial.printf("Voltage: %.2fV\n", voltage);
-  Serial.printf("Current: %.2fA\n", current);
+  Serial.print("Current: ");
+  float current = 0.0;
+  try{
+    current = readCurrent(DEVICE_ID);
+    Serial.printf("%.2fA\n", current);
+  } catch (std::runtime_error& e) {
+    Serial.println("Failed to read current");
+  }
+
+  float power = voltage * current;
   Serial.printf("Power: %.2fW\n", power);
-  Serial.printf("Throttle: %.2fms\n", throttle);
-  Serial.printf("RPM: %.0f\n", rpm);
+
+  Serial.print("Throttle: ");
+  float throttle = 0.0;
+  try{
+    throttle = readThrottle(DEVICE_ID);
+    Serial.printf("%.2fms\n", throttle);
+  } catch (std::runtime_error& e) {
+    Serial.println("Failed to read throttle");
+  }
+
+  Serial.print("RPM: ");
+  float rpm = 0.0;
+  try{
+    rpm = readRPM(DEVICE_ID);
+    Serial.printf("%.0f\n", rpm);
+  } catch (std::runtime_error& e) {
+    Serial.println("Failed to read RPM");
+  }
   
   // Check for serial input
   while (Serial.available()) {
@@ -114,7 +141,9 @@ void createCommand(uint8_t deviceId, uint8_t reg, uint16_t data, uint8_t* comman
 
 int16_t parseResponse(uint8_t* response) {
   uint8_t checksum = calculateChecksum(response, 2);
-  if (checksum != response[2]) return -1;
+  if (checksum != response[2]){
+    throw std::runtime_error("Checksum mismatch");
+  }
   return (response[0] << 8) | response[1];
 }
 
@@ -125,11 +154,27 @@ int16_t readRegister(uint8_t deviceId, uint8_t reg) {
   createCommand(deviceId, reg, 0, command);
   Serial2.write(command, 5);
   
-  if (Serial2.available() >= 3) {
-    Serial2.readBytes(response, 3);
-    return parseResponse(response);
+  uint16_t timeout = 0;
+  while (Serial2.available() < 3){
+    delay(1);
+    timeout++;
+
+    if (timeout > 1000) {
+      throw std::runtime_error("Read Timeout");
+      return -1;
+    }
   }
-  return -1;
+
+  Serial2.readBytes(response, 3);
+  
+  int16_t responseVal = parseResponse(response);
+  if (responseVal != 0xFFFF) {
+    return responseVal;
+  }
+  else {
+    throw std::runtime_error("Invalid response");
+    return -1;
+  }
 }
 
 int16_t writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) {
