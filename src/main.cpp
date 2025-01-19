@@ -23,7 +23,6 @@ bool writeThrottle(uint8_t deviceId, float throttleMs);
 String inputString = "";
 bool stringComplete = false;
 
-
 void setup() {
   // Initialize primary Serial for debugging
   Serial.begin(115200);
