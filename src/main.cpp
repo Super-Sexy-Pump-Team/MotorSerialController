@@ -8,29 +8,16 @@ String inputString = "";
 bool stringComplete = false;
 bool escapeSequenceEnabled = false;
 
+castleESC esc1(0);
+
 void setup() {
+
   // Initialize primary Serial for debugging
   Serial.begin(115200);
   while (!Serial) delay(10);
 
-  // Initialize Serial2 for ESC communication
-  Serial2.begin(SERIAL_BAUD, SERIAL_8N1, SERIAL2_RX_PIN, SERIAL2_TX_PIN);
-
-  // Ensure the throttle is set to neutral (1.5ms) at startup (this should prevent motor movement)
-  try {
-    writeThrottle(DEVICE_ID, 1.5);
-  } catch (std::runtime_error& e) {
-    Serial.println("Failed to set throttle to neutral: " + String(e.what()));
-  }
-
-  // Send 5 0x00 bytes to clear the command buffer and synchronize with the ESC
-  uint8_t clearBuffer[] = {0x00, 0x00, 0x00, 0x00, 0x00};
-  Serial2.write(clearBuffer, sizeof(clearBuffer));  // Send the 5 zero bytes
-
-  // Clear receive buffer
-  while (Serial2.available()) Serial2.read();
-
-  Serial.println("ESP32-S3 ESC Controller initialized and command buffer cleared");
+  // Initialize the Castle ESCs
+  castleESC::ESC_init();
   
 }
 
@@ -43,7 +30,7 @@ void loop() {
   Serial.print("Voltage: ");
   float voltage = 0.0;
   try{
-    voltage = readVoltage(DEVICE_ID);
+    voltage = esc1.readVoltage();
     if (escapeSequenceEnabled) Serial.print("\x1B[K");
     Serial.printf("%.2fV\n", voltage);
   } catch (std::runtime_error& e) {
@@ -55,7 +42,7 @@ void loop() {
   Serial.print("Current: ");
   float current = 0.0;
   try{
-    current = readCurrent(DEVICE_ID);
+    current = esc1.readCurrent();
     if (escapeSequenceEnabled) Serial.print("\x1B[K");
     Serial.printf("%.2fA\n", current);
   } catch (std::runtime_error& e) {
@@ -73,7 +60,7 @@ void loop() {
   Serial.print("Throttle: ");
   float throttle = 0.0;
   try{
-    throttle = readThrottle(DEVICE_ID);
+    throttle = esc1.readThrottle();
     if (escapeSequenceEnabled) Serial.print("\x1B[K");
     Serial.printf("%.2fms\n", throttle);
   } catch (std::runtime_error& e) {
@@ -85,7 +72,7 @@ void loop() {
   Serial.print("RPM: ");
   float rpm = 0.0;
   try{
-    rpm = readRPM(DEVICE_ID);
+    rpm = esc1.readRPM();
     if (escapeSequenceEnabled) Serial.print("\x1B[K");
     Serial.printf("%.0f\n", rpm);
   } catch (std::runtime_error& e) {
@@ -127,7 +114,7 @@ void loop() {
     float throttleMs = inputString.toFloat();
     if (throttleMs >= 1.0 && throttleMs <= 2.0) {
       try {
-        writeThrottle(DEVICE_ID, throttleMs);
+        esc1.writeThrottle(throttleMs);
 
         if (escapeSequenceEnabled) Serial.print("\033[9;1H\033[K\033[32m");
         Serial.println("Throttle set to " + String(throttleMs) + "ms");

@@ -35,7 +35,7 @@ This project is for developing an ESP32-S3 library to commmunicate with the Cast
     pio run --target upload
     ```
 
-### Usage
+### Live Data Monitoring
 
 1. Open the serial monitor.
 2. The ESP32-S3 will initialize and start reading data from the ESC and display it to the terminal.
@@ -44,55 +44,66 @@ This project is for developing an ESP32-S3 library to commmunicate with the Cast
 By default, the program assumes you will be using the platform.io serial monitor built into VS Code. If you are using an external serial monitor that supports ANSI escape codes, you can type `e` in the terminal to enable the use of escape codes for better data logging. Pressing `d` will once again disble the escape codes.
 
 
-## Library Functions
+## Library Usage
 
-### `float readVoltage(uint8_t deviceId)`
+### Creating an ESC object
+
+In order to use the library you must first create a `castleESC` object. When creating an ESC object you must specify a device ID between 0 and 63. If the specified ID is out of range or a device with the same ID is already active, an error will be thrown. 
+
+Once all objects are created you can initialize them using the `castleESC::ESC_init()` method. Calling the initialization method will start the `Serial2` peripheral, clear the command buffers, and attempt to set all active devices to neutral throttle. Once they are initialized, you can start reading data from the sensors and write to the throttle registers. Here is an example of creating ESC objects and reading sensor data from them:
+
+```cpp
+castleESC escObj1(ID1);
+castleESC escObj2(ID2);
+
+castleESC::ESC_init();
+
+float V1 = escObj1.readVoltage();
+float V2 = escObj2.readVoltage();
+
+Serial.printf("ESC #1 Voltage: %.2fV\n", V1);
+Serial.printf("ESC #2 Voltage: %.2fV\n", V2);
+```
+
+### Methods of the `castleESC` Class
+
+#### `float readVoltage(void)`
 
 Reads the motor voltage from the Castle ESC.
 
-- **Parameters:**
-  - `deviceId` (uint8_t): The ID of the device to read from.
 - **Returns:**
   - `float`: The voltage value (0-20V). Returns -1.0 if an error occurs.
 
-### `float readThrottle(uint8_t deviceId)`
+#### `float readThrottle(void)`
 
 Reads the throttle pulse time from the Castle ESC
 
-- **Parameters:**
-  - `deviceId` (uint8_t): The ID of the device to read from.
 - **Returns:**
   - `float`: The throttle pulse time (1-2ms). Returns -1.0 if an error occurs.
 
-### `float readCurrent(uint8_t deviceId)`
+#### `float readCurrent(void)`
 
 Reads the motor current from the Castle ESC
 
-- **Parameters:**
-  - `deviceId` (uint8_t): The ID of the device to read from.
 - **Returns:**
   - `float`: The current value (0-50A). Returns -1.0 if an error occurs.
 
-### `float readRPM(uint8_t deviceId)`
+#### `float readRPM(void)`
 
 Read the motor RPM from the Castle ESC
 
-- **Parameters:**
-  - `deviceId` (uint8_t): The ID of the device to read from.
 - **Returns:**
   - `float`: The motor RPM (0-20416). Returns -1.0 if an error occurs.
 
-### `bool writeThrottle(uint8_t deviceId, float throttleMs)`
+#### `bool writeThrottle(float throttleMs)`
 
 Set the throttle pulse time of the motor
 
 - **Parameters:**
-  - `deviceId` (uint8_t): The ID of the device to read from.
   - `throttleMs` (float): The throttle pulse time in milliseconds.
 - **Returns:**
   - `bool`: Returns `true` on successful write.
 
 ## To-Do List
-
-- [ ] Restructure the library into an object-oriented design (create motor class)
+- [ ] Use hardware timer interrupts to update data display
 - [ ] Integrate with web gui for remote control and monitoring

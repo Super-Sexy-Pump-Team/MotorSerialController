@@ -1,6 +1,6 @@
 {
     "name": "ESP32_CastleLink_ESC",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "A library to interface with Castle Creations ESCs using the CastleLink protocol on an ESP32.",
     "keywords": ["UART", "CastleLink", "ESC", "Castle Creations", "ESP32"],
     "authors": [

@@ -3,11 +3,70 @@
 
 #include "castleESC.hpp"
 
+uint8_t castleESC::activeDevices[64] = {0};
+
+/**
+ * @brief Castle ESC object constructor
+ * @retval castleESC
+ */
+castleESC::castleESC(uint8_t deviceId) {
+  if (deviceId > 63) {
+    throw std::runtime_error("Invalid device ID");
+  }
+  if (this->activeDevices[deviceId] == 1) {
+    throw std::runtime_error("Device ID already in use");
+  }
+
+  this->deviceId = deviceId;
+  this->activeDevices[deviceId] = 1;
+}
+
+
+/**
+ * @brief Castle ESC object destructor
+ * @retval void
+ */
+castleESC::~castleESC() {
+  this->activeDevices[this->deviceId] = 0;
+}
+
+
+/**
+ * @brief Initialize all active Castle ESC controllers
+ * @retval void
+ */
+void castleESC::ESC_init(void) {
+  // Initialize Serial2 for ESC communication
+  Serial2.begin(ESC_BAUD, SERIAL_8N1, ESC_RX_PIN, ESC_TX_PIN);
+
+  // Send 5 0x00 bytes to clear the command buffer and synchronize with the ESC
+  uint8_t clearBuffer[5] = {0x00, 0x00, 0x00, 0x00, 0x00};
+  Serial2.write(clearBuffer, sizeof(clearBuffer));  // Send the 5 zero bytes
+
+  // Set the throttle of all active devices to neutral (1.5ms)
+  for (int i = 0; i < 64; i++) {
+    if (activeDevices[i] == 1) {
+      uint16_t throttleValue = (uint16_t)((1.5 - 1.0) * 65535);
+      try {
+        writeRegister(i, 128, throttleValue);
+      } catch (std::runtime_error& e) {
+        Serial.println("Failed to set throttle of device #" + String(i) + " to neutral: " + String(e.what()));
+      }
+    }
+  }
+
+  // Clear receive buffer
+  while (Serial2.available()) Serial2.read();
+
+  Serial.println("ESC Controllers Initialized");
+}
+
+
 /**
   * @brief Calculate the checksum for a given data array
   * @retval uint8_t
   */
-uint8_t calculateChecksum(uint8_t* data, size_t length) {
+uint8_t castleESC::calculateChecksum(uint8_t* data, size_t length) {
   uint16_t sum = 0;
   for (size_t i = 0; i < length; i++) {
     sum += data[i];  // Sum the first four bytes (ignoring the checksum byte)
@@ -22,7 +81,7 @@ uint8_t calculateChecksum(uint8_t* data, size_t length) {
   * @brief Create a command to send to the Castle ESC
   * @retval void
   */
-void createCommand(uint8_t deviceId, uint8_t reg, uint16_t data, uint8_t* command) {
+void castleESC::createCommand(uint8_t deviceId, uint8_t reg, uint16_t data, uint8_t* command) {
   command[0] = 0x80 | (deviceId & 0x3F);      // Byte 0: Device ID
   command[1] = reg;                           // Byte 1: Register address
   command[2] = (data >> 8) & 0xFF;            // Byte 2: Write Data[15:8]
@@ -35,7 +94,7 @@ void createCommand(uint8_t deviceId, uint8_t reg, uint16_t data, uint8_t* comman
   * @brief Parse the response from the Castle ESC
   * @retval int16_t
   */
-int16_t parseResponse(uint8_t* response) {
+int16_t castleESC::parseResponse(uint8_t* response) {
   // Verify the checksum
   uint8_t checksum = calculateChecksum(response, 2);
   if (checksum != response[2]){
@@ -50,7 +109,7 @@ int16_t parseResponse(uint8_t* response) {
   * @brief Read a register from the Castle ESC
   * @retval int16_t
   */
-int16_t readRegister(uint8_t deviceId, uint8_t reg) {
+int16_t castleESC::readRegister(uint8_t deviceId, uint8_t reg) {
   uint8_t command[5];
   uint8_t response[3];
 
@@ -67,7 +126,7 @@ int16_t readRegister(uint8_t deviceId, uint8_t reg) {
     timeout++;
     
     // If the response takes too long, throw a timeout error
-    if (timeout > SERIAL_TIMEOUT) {
+    if (timeout > ESC_SERIAL_TIMEOUT) {
       throw std::runtime_error("Read Timeout");
       return -1;
     }
@@ -92,7 +151,7 @@ int16_t readRegister(uint8_t deviceId, uint8_t reg) {
   * @brief Write a register to the Castle ESC
   * @retval int16_t
   */
-int16_t writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) {
+int16_t castleESC::writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) {
   uint8_t command[5];
   uint8_t response[3];
 
@@ -109,7 +168,7 @@ int16_t writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) {
     timeout++;
 
     // If the response takes too long, throw a timeout error
-    if (timeout > SERIAL_TIMEOUT) {
+    if (timeout > ESC_SERIAL_TIMEOUT) {
       throw std::runtime_error("Write Response Timeout");
       return -1;
     }
@@ -136,11 +195,11 @@ int16_t writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) {
   * @brief Read the motor voltage from the Castle ESC
   * @retval float
   */
-float readVoltage(uint8_t deviceId) {
+float castleESC::readVoltage(void) {
   // Read the voltage register (0x00)
-  int16_t value = readRegister(deviceId, 0);
+  int16_t value = readRegister(this->deviceId, 0);
   if (value >= 0) {
-    // Convert the 16-bit value to a voltage (0-20V)
+    // Convert the 16-bit value to a voltage (0-100V)
     return (float)value / 2042.0 * 20.0;
   }
   return -1.0;
@@ -151,9 +210,9 @@ float readVoltage(uint8_t deviceId) {
   * @brief Read the throttle pulse time from the Castle ESC
   * @retval float
   */
-float readThrottle(uint8_t deviceId) {
+float castleESC::readThrottle(void) {
   // Read the throttle register (0x03)
-  int16_t value = readRegister(deviceId, 3);
+  int16_t value = readRegister(this->deviceId, 3);
   if (value >= 0) {
     // Convert the 16-bit value to a throttle pulse time (1-2ms)
     return (float)value / 2042.0 * 1.0;
@@ -166,11 +225,11 @@ float readThrottle(uint8_t deviceId) {
   * @brief Read the motor current from the Castle ESC
   * @retval float
   */
-float readCurrent(uint8_t deviceId) {
+float castleESC::readCurrent(void) {
   // Read the current register (0x02)
-  int16_t value = readRegister(deviceId, 2);
+  int16_t value = readRegister(this->deviceId, 2);
   if (value >= 0) {
-    // Convert the 16-bit value to a current (0-50A)
+    // Convert the 16-bit value to a current (0-250A)
     return (float)value / 2042.0 * 50.0;
   }
   return -1.0;
@@ -181,9 +240,9 @@ float readCurrent(uint8_t deviceId) {
   * @brief Read the motor RPM from the Castle ESC
   * @retval float
   */
-float readRPM(uint8_t deviceId) {
+float castleESC::readRPM(void) {
   // Read the RPM register (0x05)
-  int16_t value = readRegister(deviceId, 5);
+  int16_t value = readRegister(this->deviceId, 5);
   if (value >= 0) {
     // Convert the 16-bit value to an RPM (0-20416.66)
     return (float)value / 2042.0 * 20416.66;
@@ -196,9 +255,9 @@ float readRPM(uint8_t deviceId) {
   * @brief Write a throttle pulse time to the Castle ESC
   * @retval bool
   */
-bool writeThrottle(uint8_t deviceId, float throttleMs) {
+bool castleESC::writeThrottle(float throttleMs) {
   // Convert the throttle pulse time to a 16-bit value (0-65535)
   uint16_t throttleValue = (uint16_t)((throttleMs - 1.0) * 65535);
   // Write the throttle value to the ESC
-  return writeRegister(deviceId, 128, throttleValue) >= 0;
+  return writeRegister(this->deviceId, 128, throttleValue) >= 0;
 }
