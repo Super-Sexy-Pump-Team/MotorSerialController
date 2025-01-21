@@ -21,7 +21,7 @@ This project is for developing an ESP32-S3 library to commmunicate with the Cast
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/TobySagi/TobyMotorPIDLoop
+    git clone https://github.com/Super-Sexy-Pump-Team/MotorSerialController.git
     ```
 2. Open the project in Visual Studio Code.
 3. Install PlatformIO extension for Visual Studio Code.
