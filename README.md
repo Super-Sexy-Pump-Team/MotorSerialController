@@ -1,3 +1,4 @@
+# ❗RPM WRITE NOT WORKING DO NOT USE❗
 # ESP32 Castle Creations ESC Controller
 
 This project is for developing an ESP32-S3 library to commmunicate with the Castle ESC to control the motors. It communicates with the ESC using UART and reads various parameters such as voltage, current, throttle, and RPM. It also allows setting the throttle value. The library is located in the `lib` folder and can be copied to other projects. This was developed specifically for the ESP32-S3-DevKitC-1-N32R8V board but can be used with other boards by changing the `platformio.ini` file.
