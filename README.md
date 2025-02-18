@@ -19,14 +19,14 @@ This project is for developing an ESP32-S3 library to commmunicate with the Cast
 - ESP32-S3 Board (S3-DevKitC-1-N32R8V recommended)
 
 ### Hardware Setup
-Connect the components as seen in the interactive schematic below:
+Connect the components as seen schematic below. Click on the image to view an interactive version.
 
 <div style="position: relative; width: 100%; padding-top: calc(max(56.25%, 400px));">
   
   <a href="https://app.cirkitdesigner.com/project/b83b5a70-b015-454e-8b5f-c494706dc60a?view=interactive_preview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;">
     <img src="Schematic.png" alt="Schematic">
   </a>
-  
+
 </div>
 
 > [!NOTE]  
