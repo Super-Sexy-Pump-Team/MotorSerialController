@@ -19,7 +19,9 @@ This project is for developing an ESP32-S3 library to commmunicate with the Cast
 - ESP32-S3 Board (S3-DevKitC-1-N32R8V recommended)
 
 ### Hardware Setup
-Connect the components as seen schematic below. Click on the image to view an interactive version.
+The RX/TX lines need to be connected between the MCU and the Castle Serial Links, but a few intermediate steps are required. Because the serial links use 5V logic, a generic level converter is needed to step it down to 3.3V to avoid damaging the boards. Also since all connected ESCs will try to send a response after each command, a multiplexer is needed to avoid collisions and ensure you are reading from the right device.
+
+The complete schematic is shown below. Click on the image to view an interactive version.
 
 <div style="position: relative; width: 100%; padding-top: calc(max(56.25%, 400px));">
   
