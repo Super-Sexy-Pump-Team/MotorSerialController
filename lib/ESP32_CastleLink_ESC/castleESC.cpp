@@ -315,15 +315,16 @@ bool castleESC::writeThrottle(float throttleMs) {
 bool castleESC::writeRPM(uint16_t rpm_SP) {
   float P, I, D;   // Proportional, Integral, and Derivative terms
   float err = 100000;    // Error between desired and actual RPM
+  float err_prev = 0;    // Previous error value
   float output;    // Output value for the PID controller
 
-  float Kp = 0.00001;  // Proportional gain
-  float Ki = 0.000001; // Integral gain
-  float Kd = 0.01; // Derivative gain
+  int8_t Kp = 30;  // Proportional gain
+  float Ki = 0.01; // Integral gain
+  int8_t Kd = 0; // Derivative gain
   
-  float dt = 0.1;  // Time step (ms)
+  float dt = 10;  // Time step (ms)
 
-  while (std::abs(err) > 50) {
+  while (std::abs(err) > 10) {
     try{
       // Calculate the error between the desired and actual RPM
       err = (float) rpm_SP - readElectricalRPM();
@@ -339,26 +340,30 @@ bool castleESC::writeRPM(uint16_t rpm_SP) {
     I += Ki * err * dt;
 
     /* Derivative */
-    //D = Kd * (err - err_prev) / dt;
+    D = Kd * (err - err_prev) / dt;
 
     // Calculate the throttle value
-    output = P + I /*+ D*/;
+    output = (P + I + D)/10000000 + 1.55;
 
-    Serial.println("\033[13;1HUnclamped Output: \033[K" + String(output) + "ms");
+    Serial.println("\033[13;1HUnclamped Output: \033[K" + String(output, 4) + "ms");
     
-    if (output > 2.0) output = 1.9;
-    if (output < 1.5) output = 1.1;
+    if (output > 2.0) {
+      output = 1.9;
+    } else if (output < 1.5){
+      output = 1.51;
+    }
 
     try{
       // Write the throttle value to the ESC
-      Serial.println("\033[14;1HTrying to set throttle to \033[K" + String(output) + "ms");
+      Serial.println("\033[14;1HTrying to set throttle to \033[K" + String(output, 4) + "ms");
       Serial.printf("\033[15;1HCurrent Error: \033[K%.2f\n", err);
       writeThrottle(output);
     } catch (std::runtime_error& e) {
-      Serial.println("Failed to set RPM: " + String(e.what()));
+      Serial.println("\033[20Failed to set RPM: " + String(e.what()));
       return false;
     }
 
+    err_prev = err;
     delay(dt);
   }
 

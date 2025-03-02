@@ -108,7 +108,8 @@ void loop() {
     char inChar = (char)Serial.read();
     if (inChar == '\n' || inChar == '\r') { // Check for newline or carriage return (enter key)
       stringComplete = true;
-      if (escapeSequenceEnabled) Serial.print("\033[9;1H\033[1mSet Throttle Pulse (ms): \033[0m\033[K\033[s");
+      if (escapeSequenceEnabled && (controlMode == THROTTLE_MODE)) Serial.print("\033[9;1H\033[1mSet Throttle Pulse (ms): \033[0m\033[K\033[s");
+      if (escapeSequenceEnabled && (controlMode == RPM_MODE)) Serial.print("\033[9;1H\033[1mSet Desired RPM: \033[0m\033[K\033[s");
     } else if (inChar == '\x08' || inChar == '\x7F') { // Check for backspace or delete key
       if (inputString.length() > 0) {
         // Remove the last character from the input string
