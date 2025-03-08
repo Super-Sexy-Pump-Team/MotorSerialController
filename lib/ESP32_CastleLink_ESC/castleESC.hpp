@@ -2,12 +2,9 @@
 #define CASTLE_ESC_H
 
 #include <Arduino.h>
+#include <optional>
 #include "CD4051.hpp"
 
-#define ESC_RX_PIN 18          // UART RX pin
-#define ESC_TX_PIN 17          // UART TX pin
-
-#define ESC_BAUD 115200        // UART baud rate
 #define ESC_SERIAL_TIMEOUT 400 // UART timeout in milliseconds (approximate)
 #define MAX_DEVICES 8          // Maximum number of Castle ESC devices
 
@@ -20,6 +17,7 @@ class castleESC{
   private:
 
     uint8_t deviceId; // Device ID for the Castle ESC
+    static HardwareSerial *_serialDevice; // Serial device used for ESC communication
     static uint8_t activeDevices[MAX_DEVICES]; // Array to track active devices
 
     static uint8_t calculateChecksum(uint8_t* data, size_t length);
@@ -36,9 +34,9 @@ class castleESC{
 
     castleESC(uint8_t deviceId);
 
-    ~castleESC(void);
+    ~castleESC();
 
-    static void ESC_init(void);
+    static void ESC_init(HardwareSerial *serialDevice, long baud, uint8_t rxPin, uint8_t txPin, uint8_t muxInh=0, uint8_t muxA=0, uint8_t muxB=0, uint8_t muxC=0);
 
     uint8_t getDeviceId(void);
 

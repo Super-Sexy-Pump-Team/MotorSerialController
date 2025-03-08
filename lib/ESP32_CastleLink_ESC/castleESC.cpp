@@ -1,10 +1,13 @@
 #include <Arduino.h>
 #include <stdexcept>
-#include <bits/stdc++.h>
+#include <optional>
 
 #include "castleESC.hpp"
 
-uint8_t castleESC::activeDevices[MAX_DEVICES] = {0};
+
+HardwareSerial* castleESC::_serialDevice = &Serial2; // Serial device used for ESC communication
+uint8_t castleESC::activeDevices[MAX_DEVICES] = {0}; // Array to track active devices
+
 
 /**
  * @brief Castle ESC object constructor
@@ -35,17 +38,28 @@ castleESC::~castleESC(void) {
 
 /**
  * @brief Initialize all active Castle ESC controllers
- * @param void
+ * @param serialDevice Pointer to Serial device to use for ESC communication
+ * @param baud Baud rate for the serial communication
+ * @param rxPin RX pin for the serial communication
+ * @param txPin TX pin for the serial communication
+ * @param muxInh MUX INH pin
+ * @param muxA MUX A pin
+ * @param muxB MUX B pin
+ * @param muxC MUX C pin
  * @retval void
  */
-void castleESC::ESC_init(void) {
-  // Initialize Serial2 for ESC communication
-  Serial2.begin(ESC_BAUD, SERIAL_8N1, ESC_RX_PIN, ESC_TX_PIN);
-  MUX_init();
+void castleESC::ESC_init(HardwareSerial *serialDevice, long baud, uint8_t rxPin, uint8_t txPin, uint8_t muxInh, uint8_t muxA, uint8_t muxB, uint8_t muxC) {
+
+  castleESC::_serialDevice = serialDevice;
+
+  // Initialize Serial for ESC communication
+  _serialDevice->begin(baud, SERIAL_8N1, rxPin, txPin);
+  // Initialize the MUX
+  MUX_init(muxInh, muxA, muxB, muxC);
 
   // Send 5 0x00 bytes to clear the command buffer and synchronize with the ESC
   uint8_t clearBuffer[5] = {0x00, 0x00, 0x00, 0x00, 0x00};
-  Serial2.write(clearBuffer, sizeof(clearBuffer));  // Send the 5 zero bytes
+  _serialDevice->write(clearBuffer, sizeof(clearBuffer));  // Send the 5 zero bytes
 
   // Set the throttle of all active devices to neutral (1.5ms)
   for (int i = 0; i < MAX_DEVICES; i++) {
@@ -60,7 +74,7 @@ void castleESC::ESC_init(void) {
   }
 
   // Clear receive buffer
-  while (Serial2.available()) Serial2.read();
+  while (_serialDevice->available()) _serialDevice->read();
 
   Serial.println("ESC Controllers Initialized");
 }
@@ -127,15 +141,15 @@ int16_t castleESC::readRegister(uint8_t deviceId, uint8_t reg) {
   uint8_t response[3];
 
   MUX_select(deviceId);
-  while (Serial2.available()) Serial2.read();  // Clear receive buffer
+  while (_serialDevice->available()) _serialDevice->read();  // Clear receive buffer
   
   // Create the command and send it to the ESC
   createCommand(deviceId, reg, 0, command);
-  Serial2.write(command, 5);
+  _serialDevice->write(command, 5);
   
   uint16_t timeout = 0;
   // Wait for the full response
-  while (Serial2.available() < 3){
+  while (_serialDevice->available() < 3){
     delay(1);
     timeout++;
     
@@ -150,7 +164,7 @@ int16_t castleESC::readRegister(uint8_t deviceId, uint8_t reg) {
   MUX_disable();
 
   // Read the response from the ESC
-  Serial2.readBytes(response, 3);
+  _serialDevice->readBytes(response, 3);
   int16_t responseVal = parseResponse(response);
 
   if (responseVal != 0xFFFF) { // Check for invalid response (corrupted data or wrong register)
@@ -176,15 +190,15 @@ int16_t castleESC::writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) 
   uint8_t response[3];
 
   MUX_select(deviceId);
-  while (Serial2.available()) Serial2.read();  // Clear receive buffer
+  while (_serialDevice->available()) _serialDevice->read();  // Clear receive buffer
 
   // Create the command and send it to the ESC  
   createCommand(deviceId, reg, value, command);
-  Serial2.write(command, 5);
+  _serialDevice->write(command, 5);
   
   uint16_t timeout = 0;
   // Wait for the full response
-  while (Serial2.available() < 3){
+  while (_serialDevice->available() < 3){
     delay(1);
     timeout++;
 
@@ -199,7 +213,7 @@ int16_t castleESC::writeRegister(uint8_t deviceId, uint8_t reg, uint16_t value) 
   MUX_disable();
 
   // Read the response from the ESC
-  Serial2.readBytes(response, 3);
+  _serialDevice->readBytes(response, 3);
   int16_t responseVal = parseResponse(response);
 
   // Response data for write commands can be ignored

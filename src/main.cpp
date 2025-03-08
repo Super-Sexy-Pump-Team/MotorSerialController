@@ -3,6 +3,15 @@
 
 #include "castleESC.hpp"
 
+#define ESC_TX_PIN 17          // UART TX pin
+#define ESC_RX_PIN 18          // UART RX pin
+#define ESC_BAUD 115200        // UART baud rate
+#define ESC_SERIAL Serial2     // UART serial device
+
+// MUX pins
+#define MUX_A 11    // MUX A pin
+#define MUX_INH 10  // MUX INH pin
+
 typedef enum{
   RPM_MODE,
   THROTTLE_MODE
@@ -23,7 +32,7 @@ void setup() {
   while (!Serial) delay(10);
 
   // Initialize the Castle ESCs
-  castleESC::ESC_init();
+  castleESC::ESC_init(&ESC_SERIAL, ESC_BAUD, ESC_RX_PIN, ESC_TX_PIN, MUX_INH, MUX_A);
   
 }
 
