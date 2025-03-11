@@ -181,7 +181,7 @@ void loop() {
       uint16_t rpm = inputString.toInt();
       if (rpm >= 0 && rpm <= 10000){
         try {
-          esc1.writeRPM(rpm);
+          esc1.setRPM(rpm);
 
           if (escapeSequenceEnabled) Serial.print("\033[10;1H\033[K\033[32m");
           Serial.println("RPM set to " + String(rpm));

@@ -326,7 +326,7 @@ bool castleESC::writeThrottle(float throttleMs) {
   * @param rpm_SP RPM setpoint
   * @retval bool
   */
-bool castleESC::writeRPM(uint16_t rpm_SP) {
+bool castleESC::setRPM(uint16_t rpm_SP) {
   float P, I, D;   // Proportional, Integral, and Derivative terms
   float err = 100000;    // Error between desired and actual RPM
   float err_prev = 0;    // Previous error value

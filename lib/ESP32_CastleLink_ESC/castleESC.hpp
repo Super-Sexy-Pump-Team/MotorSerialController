@@ -52,7 +52,7 @@ class castleESC{
 
     bool writeThrottle(float throttleMs);
 
-    bool writeRPM(uint16_t rpm);
+    bool setRPM(uint16_t rpm);
 };
 
 #endif
